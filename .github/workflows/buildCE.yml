@@ -231,7 +231,7 @@ jobs:
       - name: Download installer
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         run: curl.exe -A '${{ steps.generate-ua.outputs.ua }}' -L -o CheatEngine.exe ${{ steps.get-info.outputs.ceurl }}
-            - name: Validate installer download
+      - name: Validate installer download
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
