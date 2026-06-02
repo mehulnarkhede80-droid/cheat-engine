@@ -231,15 +231,53 @@ jobs:
       - name: Download installer
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         run: curl.exe -A '${{ steps.generate-ua.outputs.ua }}' -L -o CheatEngine.exe ${{ steps.get-info.outputs.ceurl }}
+            - name: Validate installer download
+        if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $fileSize = (Get-Item CheatEngine.exe).Length
+          if ($fileSize -lt 1000000) {
+            throw "Downloaded file appears too small ($fileSize bytes), likely corrupted or incomplete"
+          }
+          Write-Host "Installer validated. Size: $fileSize bytes"
+      
       - name: Download extractor
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         run: curl.exe -L --retry 15 --retry-all-errors --retry-delay 5 -o innounp050.rar https://downloads.sourceforge.net/project/innounp/innounp/innounp%200.50/innounp050.rar
+      
       - name: Extract extractor
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         run: 7z e innounp050.rar
-      - name: Extract installer
+      
+      - name: Extract installer (with retry)
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
-        run: .\innounp.exe CheatEngine.exe -x -m
+        shell: pwsh
+        run: |
+          $retryCount = 0
+          $maxRetries = 2
+          $success = $false
+          
+          while ($retryCount -lt $maxRetries -and -not $success) {
+            try {
+              Write-Host "Extraction attempt $($retryCount + 1) of $maxRetries..."
+              & ".\innounp.exe" CheatEngine.exe -x -m
+              
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "Extraction succeeded"
+                $success = $true
+              } else {
+                throw "innounp exited with code $LASTEXITCODE"
+              }
+            } catch {
+              $retryCount++
+              if ($retryCount -lt $maxRetries) {
+                Write-Host "Extraction failed: $_. Retrying..."
+                Start-Sleep -Seconds 5
+              } else {
+                throw "Extraction failed after $maxRetries attempts: $_"
+              }
+            }
+          }
       - name: Get Extracted installer dl path
         if: steps.cache-cheat-engine.outputs.cache-hit != 'true'
         id: extracted-installer
